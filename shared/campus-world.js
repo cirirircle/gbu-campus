@@ -180,7 +180,7 @@ export function build(scene, renderer, {night = false, onProgress = () => {}} = 
       box(x,2.4,back,w,4.8,.35,m.porcelain);obstacle(x,back,w,.5,'teaching-back');
       for(const s of [-1,1]){box(x+s*w/2,2.4,z,.32,4.8,d,m.porcelain);obstacle(x+s*w/2,z,.48,d,'teaching-side');}
       windowGrid(x,back+.2,w-2,3.5,.3);
-    }else{box(x,2.4,z,w,4.8,d,m.glass);obstacle(x,z,w,d,'academic');}
+   }else{box(x,2.4,z,w,4.8,d,m.glass);obstacle(x,z,w,d,'academic');}
     // Piers carry the elevated louvered volume and leave the central entry open.
     for(let dx=-w/2+1;dx<w/2;dx+=4.9){if(open&&Math.abs(dx)<3.2)continue;box(x+dx,2.8,front-.6,.55,5.6,.7,m.porcelain);if(open)obstacle(x+dx,front-.6,.65,.8,'teaching-pier');}
     box(x,(h+5.7)/2,z,w,h-5.7,d,m.glass);
@@ -311,19 +311,82 @@ export function build(scene, renderer, {night = false, onProgress = () => {}} = 
     }
     if(base<.1)obstacle(x,z,.55,.55,'tree-trunk');
   }
-  function palm(x,z,h=9){
-    beam([x,0,z],[x+.25,h,z],.20,m.bark,.10,8);
-    for(let i=0;i<12;i++)box(x,h*(i/12),z,.38,.025,.38,m.joint);
-    for(let fr=0;fr<9;fr++){
-      const a=fr/9*TAU,dx=Math.cos(a),dz=Math.sin(a),pts=[];
-      for(let k=0;k<=8;k++){const t=k/8;pts.push([x+.25+dx*t*3.6,h+Math.sin(t*Math.PI)*.7-t*t*1.35,z+dz*t*3.6]);}
-      for(let k=1;k<pts.length;k++)beam(pts[k-1],pts[k],.037,m.leafDark,.016,4);
-      for(let k=1;k<=7;k++)for(const side of [-1,1]){
-        const p=pts[k],len=(1-k/9)*1.6,tip=[p[0]-dz*len*side-dx*.22,p[1]-.35,p[2]+dx*len*side-dz*.22];
-        const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([...p,p[0]+dx*.40,p[1]-.04,p[2]+dz*.40,...tip,...tip,p[0]+dx*.40,p[1]-.04,p[2]+dz*.40,...p],3));g.computeVertexNormals();batch(g,fr%2?m.leaf:m.leafLight);
+    function palm(x,z,h=9){
+    const sway=.35+rng()*.25;
+    const points=[];
+    const segments=8;
+
+    // A slightly curved, tapered trunk.
+    for(let i=0;i<=segments;i++){
+      const t=i/segments;
+      points.push([
+        x+sway*Math.sin(t*Math.PI*.72),
+        t*h,
+        z-.16*Math.sin(t*Math.PI)
+      ]);
+    }
+
+    for(let i=1;i<points.length;i++){
+      const t=i/segments;
+      const radius=.22*(1-t*.55);
+      beam(points[i-1],points[i],radius,m.bark,radius*.52,8);
+    }
+
+    const crown=points[points.length-1];
+
+    // Uneven fronds with varied length, angle and downward curve.
+    for(let fr=0;fr<15;fr++){
+  const angle=fr/15*TAU+(rng()-.5)*.30;
+      const dx=Math.cos(angle);
+      const dz=Math.sin(angle);
+      const length=3.0+rng()*1.35;
+      const droop=.7+rng()*.9;
+const rise=.25+rng()*.65;
+const frond=[];
+
+      for(let k=0;k<=9;k++){
+        const t=k/9;
+        frond.push([
+          crown[0]+dx*length*t,
+          crown[1]+Math.sin(t*Math.PI)*rise-t*t*droop,
+          crown[2]+dz*length*t
+        ]);
+      }
+
+      for(let k=1;k<frond.length;k++){
+        beam(frond[k-1],frond[k],.045*(1-k/12),m.leafDark,.018,5);
+      }
+
+      // Small leaflets placed along both sides of each frond.
+      for(let k=1;k<=9;k++){
+        const p=frond[k];
+        const sideX=-dz;
+        const sideZ=dx;
+        const leafletLength=(1-k/12)*1.5+.3;
+
+        for(const side of [-1,1]){
+          const tip=[
+            p[0]+sideX*leafletLength*side+dx*.12,
+            p[1]-.28-rng()*.12,
+            p[2]+sideZ*leafletLength*side+dz*.12
+          ];
+
+          const g=new THREE.BufferGeometry();
+          g.setAttribute('position',new THREE.Float32BufferAttribute([
+            p[0],p[1],p[2],
+            p[0]+dx*.34,p[1]-.03,p[2]+dz*.34,
+            tip[0],tip[1],tip[2],
+            tip[0],tip[1],tip[2],
+            p[0]+dx*.34,p[1]-.03,p[2]+dz*.34,
+            p[0],p[1],p[2]
+          ],3));
+          g.computeVertexNormals();
+          batch(g,(fr+k)%2?m.leaf:m.leafLight);
+        }
       }
     }
-    obstacle(x,z,.6,.6,'palm-trunk');
+
+obstacle(x,z,.6,.6,'palm-trunk');
   }
   // Plantings follow the model's perimeter rhythm; omit any object near a contracted route.
   for(let x=-132;x<=135;x+=10.5)for(const z of [48,-52])if(!nearRoute(x,z,4)&&!blocked(x,z,3))tree(x,z,6+rng()*2);
